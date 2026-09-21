@@ -1,0 +1,49 @@
+name: probe
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: reachability
+        run: |
+          set -u
+          O='https://repo.archlinuxpower.org/base/powerpc/base.db'
+          P='https://api.rv.pkgforge.dev/https://repo.archlinuxpower.org/base/powerpc/base.db'
+          OENC='https%3A%2F%2Frepo.archlinuxpower.org%2Fbase%2Fpowerpc%2Fbase.db'
+
+          show() { # NAME URL [curl args...]
+            name="$1"; url="$2"; shift 2
+            out="$(curl -sS -o /tmp/body -w '%{http_code} %{size_download} %{remote_ip}' \
+                     --connect-timeout 15 --max-time 90 "$@" "$url" 2>&1)" || true
+            printf '%-28s %s\n' "$name" "$out"
+          }
+
+          echo '--- sanity ---'
+          show archlinux.org 'https://archlinux.org/'
+          echo '--- the two known paths ---'
+          show origin "$O"
+          show proxy "$P"
+          echo '--- variants of the known paths ---'
+          show origin-http1.1 "$O" --http1.1
+          show origin-browserUA "$O" -H 'User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/128 Safari/537.36' -H 'Accept: text/html,application/xhtml+xml,application/octet-stream'
+          show origin-pacmanUA "$O" -A 'pacman/7.1.0'
+          show proxy-http1.1 "$P" --http1.1
+          echo '--- candidate read-through paths ---'
+          show allorigins-raw "https://api.allorigins.win/raw?url=$OENC"
+          show allorigins-get "https://api.allorigins.win/get?url=$OENC"
+          show codetabs "https://api.codetabs.com/v1/proxy?quest=$OENC"
+          show corsproxy.io "https://corsproxy.io/?url=$OENC"
+          show cors.lol "https://api.cors.lol/?url=$OENC"
+          show whateverorigin "http://www.whateverorigin.org/get?url=$OENC"
+          show thingproxy "https://thingproxy.freeboard.io/fetch/$O"
+          show cors-anywhere "https://cors-anywhere.herokuapp.com/$O"
+          show test.cors.workers.dev "https://test.cors.workers.dev/?$O"
+          show ghproxy.net "https://ghproxy.net/$O"
+          show gh-proxy.com "https://gh-proxy.com/$O"
+          echo '--- what a 403 body says ---'
+          curl -sS --max-time 60 -o /tmp/b1 -w 'origin body bytes=%{size_download}\n' "$O" || true
+          head -c 400 /tmp/b1; echo
+          curl -sS --max-time 60 -o /tmp/b2 -w 'proxy body bytes=%{size_download}\n' "$P" || true
+          head -c 400 /tmp/b2; echo
