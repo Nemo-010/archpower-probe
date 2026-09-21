@@ -1,0 +1,34 @@
+name: probe2
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: user agents
+        run: |
+          set -u
+          P='https://api.rv.pkgforge.dev/https://repo.archlinuxpower.org/base/powerpc/base.db'
+          O='https://repo.archlinuxpower.org/base/powerpc/base.db'
+          t() { # NAME URL args...
+            n="$1"; u="$2"; shift 2
+            c="$(curl -sS -o /tmp/b -w '%{http_code} %{size_download}' --connect-timeout 15 --max-time 90 "$@" "$u" 2>&1)" || true
+            first="$(tr -d '\n' < /tmp/b | head -c 40)"
+            printf '%-34s %-14s %s\n' "$n" "$c" "$first"
+          }
+          echo '== proxy, vary UA =='
+          t proxy-default       "$P"
+          t proxy-repoUA        "$P" -A 'docker-archlinux-mirrorlist/1 (+https://github.com/pkgforge-dev/docker-archlinux)'
+          t proxy-curlUA        "$P" -A "curl/$(curl --version | head -1 | awk '{print $2}')"
+          t proxy-pacmanUA      "$P" -A 'pacman/7.1.0'
+          t proxy-wgetUA        "$P" -A 'Wget/1.21.4'
+          t proxy-safariUA      "$P" -A 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Safari/605.1.15'
+          t proxy-chromeFull    "$P" -A 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36' -H 'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8' -H 'Accept-Language: en-US,en;q=0.9' -H 'Accept-Encoding: gzip, deflate, br' --compressed
+          t proxy-noUA         "$P" -H 'User-Agent:'
+          echo '== origin, vary UA =='
+          t origin-repoUA       "$O" -A 'docker-archlinux-mirrorlist/1 (+https://github.com/pkgforge-dev/docker-archlinux)'
+          t origin-chromeFull   "$O" -A 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36' -H 'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8' -H 'Accept-Language: en-US,en;q=0.9' --compressed
+          echo '== is it the pkgforge zone? =='
+          t pkgforge-root      'https://pkgforge.dev/'
+          t api-gh-rate        'https://api.gh.pkgforge.dev/rate_limit'
