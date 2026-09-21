@@ -1,0 +1,23 @@
+name: probe3
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: worker behaviour
+        run: |
+          set -u
+          t() { n="$1"; u="$2"
+            c="$(curl -sS -o /tmp/b -w '%{http_code} %{size_download}' --connect-timeout 15 --max-time 90 "$u" 2>&1)" || true
+            printf '%-30s %-12s ' "$n" "$c"; head -c 90 /tmp/b | tr -d '\n'; echo
+          }
+          R='https://api.rv.pkgforge.dev'
+          t example.com        "$R/https://example.com/"
+          t archlinux.org      "$R/https://archlinux.org/"
+          t ifconfig-ip        "$R/https://ifconfig.me/ip"
+          t httpbin-headers    "$R/https://httpbin.org/headers"
+          t archpower-db       "$R/https://repo.archlinuxpower.org/base/powerpc/base.db"
+          t archpower-any      "$R/https://repo.archlinuxpower.org/base/any/"
+          t direct-ifconfig    'https://ifconfig.me/ip'
